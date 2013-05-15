@@ -43,7 +43,7 @@ const unsigned char Init_Vector1[] =
 	0xA2,
 	0xAE,
 	0x48,	// Set Duty ratio
-	0x80, 	// nop
+	0x64, //0x80, 	// nop
 	0xA0,	// Set scan direction
 	0xC8,	// SHL select
 	0x40,	// initial Com0 register
@@ -68,15 +68,15 @@ const unsigned char Init_Vector3[] =
 
 const unsigned char Init_Vector4[] =
 {
-	0x67	// 5x
+	0x67	// 6x
 };
 	// delay(2);
 
 const unsigned char Init_Vector5[] =
 {
-	0x27,	// Select regulator resistor
+	0x25,	// Select regulator resistor
 	0x81,	// Select electronic volumen register
-	63, //12,
+	12,
 	0x50,	//0x57,  	// Select LCD BIAS
 	0x92,	// frc and pwm
 	0x2C
@@ -302,30 +302,10 @@ const unsigned char dummy[] = "Hola mundo";
 
 void write_line(unsigned char *text)
 {
-/*	unsigned char i,j,k;
-	i=j=k=0;
-
-	while (i<160)
-	{
-		if(text[j]!='\0')
-		{
-			dbuffer[i]=	arial_6ptBitmaps[arial_6ptDescriptors[text[j]-0x20+k][1]];
-			k++;
-			if(k>=arial_6ptDescriptors[text[j]-0x20][0])
-			{
-				k=0;
-				j++;
-			}
-		}
-		else
-			break;
-		i++;
-	}*/
-
 	unsigned char n=0;
 	unsigned int i=0;
 	unsigned char k=0;
-//	unsigned char descriptor=0;
+
 
 	while((text[n]!='\0')&&(i<155))
 	{
@@ -344,7 +324,6 @@ void send_line(unsigned char line)
 {
 	unsigned char page_column[] = {0xB0,0x10,0x01};
 	page_column[0] = 0xB0+(line&0x0F);
-	//unsigned char * text = (unsigned char *) vertical;
 
 	// Send page (line) and line Y9:Y2 (column) to start
 	block_tansfer_LCD(Comsend, (unsigned char *) page_column, 3);
@@ -404,42 +383,31 @@ void main(void) {
 
 
 
-
-/*
 #pragma vector = USCIAB0TX_VECTOR
 __interrupt void USCIAB0TX_ISR(void)
 {
-  static unsigned char ByteCtr;
-
-  UCB0TXBUF = block_ptr[ByteCtr++];          // Transmit data byte
-
-  if(ByteCtr>block_length)
-  {
-	  __bic_SR_register_on_exit(CPUOFF);        // Exit LPM0
-	  ByteCtr=0;
-  }
-
-}*/
-
-#pragma vector = USCIAB0TX_VECTOR
-__interrupt void USCIAB0TX_ISR(void)
-{
-  static unsigned char ByteCtr;
+  static unsigned int ByteCtr;
 
   if(block_repeat)
   {
 	  UCB0TXBUF = block_ptr[ByteCtr>>2];
 	  ByteCtr++;
+
+	  if(ByteCtr>(block_length<<2))
+	  {
+		  __bic_SR_register_on_exit(CPUOFF);        // Exit LPM0
+		  ByteCtr=0;
+		  block_repeat = 0;
+	  }
   }
   else
+  {
 	  UCB0TXBUF = block_ptr[ByteCtr++];          // Transmit data byte
 
-  if(ByteCtr>block_length)
-  {
-	  __bic_SR_register_on_exit(CPUOFF);        // Exit LPM0
-	  ByteCtr=0;
-	  block_repeat = 0;
+	  if(ByteCtr>block_length)
+	  {
+		  __bic_SR_register_on_exit(CPUOFF);        // Exit LPM0
+		  ByteCtr=0;
+	  }
   }
-
 }
-
