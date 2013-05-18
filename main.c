@@ -74,20 +74,20 @@ const unsigned char Init_Vector5[] =
 	55,
 	0x55, 	// Select LCD BIAS
 	0x92,	// FRC & PWM
-	0x2C
+	0x2C	// Sequential power 1
 };
 
 
 const unsigned char Init_Vector6[] =
 {
-	0x2E
+	0x2E	// Sequential power 2
 };
 
 
 const unsigned char Init_Vector7[] =
 {
 
-	0x2F
+	0x2F	// Sequential power 3
 };
 
 
