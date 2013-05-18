@@ -363,16 +363,18 @@ void clear_line(unsigned char line)
 {
 	unsigned char i;
 	unsigned char page_column[] = {0xB0,0x10,0x01};
-	page_column[0] = 0xB0+(line&0x0F);
-
-	// Set address to upper line
-	block_tansfer_LCD(Comsend, (unsigned char *) page_column, 3);
 
 	//Clear bitmap
 	for(i=0;i<160;i++)
 	{
-		dbuffer[1][i]=dbuffer[0][i]=0;
+		dbuffer[0][i]=0;
+		dbuffer[1][i]=0;
 	}
+
+	// Set address to upper line
+	page_column[0] = 0xB0+(line&0x0F);
+	block_tansfer_LCD(Comsend, (unsigned char *) page_column, 3);
+	t_delay(2);
 
 	// Send upper bitmap
 	block_tansfer_LCD(Datasend, (unsigned char *) dbuffer[1], 160);
@@ -380,6 +382,7 @@ void clear_line(unsigned char line)
 	// Set address to lower line
 	page_column[0] = 0xB0+(line&0x0F)+1;
 	block_tansfer_LCD(Comsend, (unsigned char *) page_column, 3);
+	t_delay(2);
 
 	// Send lower bitmap
 	block_tansfer_LCD(Datasend, (unsigned char *) dbuffer[0], 160);
