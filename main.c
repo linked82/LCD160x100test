@@ -40,10 +40,10 @@
 
 const unsigned char Init_Vector1[] =
 {
-	0xA2,
-	0xAE,
+	0xA2,	// Icon off
+	0xAE,	// LCD off
 	0x48,	// Set Duty ratio
-	0x64, //0x80, 	// nop
+	0x64,
 	0xA0,	// Set scan direction
 	0xC8,	// SHL select
 	0x40,	// initial Com0 register
@@ -52,43 +52,37 @@ const unsigned char Init_Vector1[] =
 	0x64	// 3x
 };
 
-	// delay(2);
-
 const unsigned char Init_Vector2[] =
 {
 	0x65	// 4x
 };
-	//  delay(2);
 
 const unsigned char Init_Vector3[] =
 {
 	0x66	// 5x
 };
-	// delay(2);
 
 const unsigned char Init_Vector4[] =
 {
 	0x67	// 6x
 };
-	// delay(2);
 
 const unsigned char Init_Vector5[] =
 {
 	0x25,	// Select regulator resistor
 	0x81,	// Select electronic volumen register
-	12,
-	0x50,	//0x57,  	// Select LCD BIAS
-	0x92,	// frc and pwm
+	55,
+	0x55, 	// Select LCD BIAS
+	0x92,	// FRC & PWM
 	0x2C
 };
 
-	// delay(200);
+
 const unsigned char Init_Vector6[] =
 {
 	0x2E
 };
 
-	// delay(200);
 
 const unsigned char Init_Vector7[] =
 {
@@ -96,14 +90,14 @@ const unsigned char Init_Vector7[] =
 	0x2F
 };
 
-// delay(200);
+
 
 const unsigned char Init_Vector8[] =
 {
-	0x92,
-	0x38,
+	0x92,	// FRC & PWM
+	0x38,   // Mode 1
 	0x75,
-	0x97,	// 3frc, 45 pwm
+	0x97,	// 3 FRC, 45 PWM
 	0x80,	// start 16-level grayscale settings
 	0x00,
 	0x81,
@@ -231,10 +225,10 @@ const unsigned char Init_Vector8[] =
 	0xBE,
 	0x3C,
 	0xBF,
-	0x3C,	// end grayscale settings
+	0x3C,	// End grayscale settings
 	0x38,
 	0x74,
-	0xAF 	// display on
+	0xAF 	// Display on
 
 };
 
@@ -243,12 +237,14 @@ const unsigned char Init_Vector8[] =
 
 static void t_delay (unsigned long i)
 {
-	unsigned long j = i*1000;
+	// TODO: Do hardware delay
 
-	while (j>0)
+	i = i<<8;
+
+	while (i>0)
 	{
 		__no_operation();
-		j--;
+		i--;
 	}
 }
 
@@ -259,25 +255,32 @@ unsigned int block_repeat = 0;
 
 void block_tansfer_LCD(unsigned char A0, unsigned char * data, unsigned int length)
 {
-
+	// Copy global flags. If sending data, the flag block_repeat will enable the transmission of each byte four times.
 	block_ptr = data;
 	block_length = length;
+	if(A0!=0)	block_repeat = 1;
 
-	IE2 |= UCB0TXIE;                          // Enable TX ready interrupt
-	UCB0CTL1 |= UCTR + UCTXSTT;               // I2C TX, start condition
-	UCB0TXBUF = A0;                        // Write DAC control byte
-	__bis_SR_register(CPUOFF + GIE);          // Enter LPM0 w/ interrupts
+    // Enable TX ready interrupt
+	IE2 |= UCB0TXIE;
+    // I2C TX, start condition
+	UCB0CTL1 |= UCTR + UCTXSTT;
+    // Write first byte: command
+	UCB0TXBUF = A0;
+    // Enter LPM0 w/ interrupts
+	__bis_SR_register(CPUOFF + GIE);
 
-	IE2 &= ~UCB0TXIE;                          // Disable TX ready interrupt
-
-	while (UCB0CTL1 & UCTXSTT);             // Loop until I2C STT is sent
-	UCB0CTL1 |= UCTXSTP;                    // I2C stop condition after 1st TX
-	__bic_SR_register(GIE);          // Enter LPM0 w/ interrupts
+	// Disable TX ready interrupt
+	IE2 &= ~UCB0TXIE;
+	// Loop until I2C STT is sent
+	while (UCB0CTL1 & UCTXSTT);
+	// I2C stop condition
+	UCB0CTL1 |= UCTXSTP;
 }
 
 
 void init_LCD(void)
 {
+	// Send each block with required delays
 	block_tansfer_LCD(Comsend, (unsigned char *) Init_Vector1, 10);
 	t_delay(2);
 	block_tansfer_LCD(Comsend, (unsigned char *) Init_Vector2, 1);
@@ -287,36 +290,50 @@ void init_LCD(void)
 	block_tansfer_LCD(Comsend, (unsigned char *) Init_Vector4, 1);
 	t_delay(2);
 	block_tansfer_LCD(Comsend, (unsigned char *) Init_Vector5, 6);
-	t_delay(200);
+	t_delay(100);
 	block_tansfer_LCD(Comsend, (unsigned char *) Init_Vector6, 1);
-	t_delay(200);
+	t_delay(100);
 	block_tansfer_LCD(Comsend, (unsigned char *) Init_Vector7, 1);
-	t_delay(200);
+	t_delay(100);
 	block_tansfer_LCD(Comsend, (unsigned char *) Init_Vector8, 135);
 	t_delay(2);
 
 }
 
-volatile unsigned char dbuffer[160];
-const unsigned char dummy[] = "Hola mundo";
+volatile unsigned char dbuffer[2][160];
+
 
 void write_line(unsigned char *text)
 {
+	// Caharacter index
 	unsigned char n=0;
+	// Byte index
 	unsigned int i=0;
+	// Character bitmap index
 	unsigned char k=0;
 
 
 	while((text[n]!='\0')&&(i<155))
 	{
-		for(k=0;k<arial_6ptDescriptors[text[n]-0x20][0];k++)
+		for(k=0;k<((arial_8ptDescriptors[text[n]-0x20][0])<<1);k++)
 		{
-			dbuffer[i]=	arial_6ptBitmaps[arial_6ptDescriptors[text[n]-0x20][1]+k];
+			dbuffer[0][i]=	arial_8ptBitmaps[arial_8ptDescriptors[text[n]-0x20][1]+k];
+			dbuffer[1][i]=	arial_8ptBitmaps[arial_8ptDescriptors[text[n]-0x20][1]+k+1];
 			i++;
+			k++;
 		}
-		dbuffer[i]=0;
+		// Insert one line between characters
+		dbuffer[0][i]=0;
+		dbuffer[1][i]=0;
 		i++;
 		n++;
+	}
+	// Insert trailing blank spaces
+	while(i<160)
+	{
+		dbuffer[0][i]= 0;
+		dbuffer[1][i]= 0;
+		i++;
 	}
 }
 
@@ -325,12 +342,59 @@ void send_line(unsigned char line)
 	unsigned char page_column[] = {0xB0,0x10,0x01};
 	page_column[0] = 0xB0+(line&0x0F);
 
-	// Send page (line) and line Y9:Y2 (column) to start
+	// Set address to upper line
+	block_tansfer_LCD(Comsend, (unsigned char *) page_column, 3);
+	t_delay(2);
+
+	// Send upper bitmap
+	block_tansfer_LCD(Datasend, (unsigned char *) dbuffer[1], 160);
+
+	// Set address to lower line
+	page_column[0] = 0xB0+(line&0x0F)+1;
+	block_tansfer_LCD(Comsend, (unsigned char *) page_column, 3);
+	t_delay(2);
+
+	// Send lower bitmap
+	block_tansfer_LCD(Datasend, (unsigned char *) dbuffer[0], 160);
+
+}
+
+void clear_line(unsigned char line)
+{
+	unsigned char i;
+	unsigned char page_column[] = {0xB0,0x10,0x01};
+	page_column[0] = 0xB0+(line&0x0F);
+
+	// Set address to upper line
 	block_tansfer_LCD(Comsend, (unsigned char *) page_column, 3);
 
-	// Send line
-	block_repeat = 1;
-	block_tansfer_LCD(Datasend, (unsigned char *) dbuffer, 160);
+	//Clear bitmap
+	for(i=0;i<160;i++)
+	{
+		dbuffer[1][i]=dbuffer[0][i]=0;
+	}
+
+	// Send upper bitmap
+	block_tansfer_LCD(Datasend, (unsigned char *) dbuffer[1], 160);
+
+	// Set address to lower line
+	page_column[0] = 0xB0+(line&0x0F)+1;
+	block_tansfer_LCD(Comsend, (unsigned char *) page_column, 3);
+
+	// Send lower bitmap
+	block_tansfer_LCD(Datasend, (unsigned char *) dbuffer[0], 160);
+}
+
+
+void clear_screen(void)
+{
+	unsigned char i=0;
+
+	while(i<14)
+	{
+		clear_line(i);
+		i=i+2;
+	}
 }
 
 
@@ -338,45 +402,60 @@ void send_line(unsigned char line)
 
 void main(void) {
 	
-	WDTCTL = WDTPW + WDTHOLD;                 // Stop Watchdog Timer
+	WDTCTL = WDTPW + WDTHOLD;               // Stop Watchdog Timer
 
-	P1SEL |= BIT6 + BIT7;                     // Assign I2C pins to USCI_B0
-	P1SEL2|= BIT6 + BIT7;                     // Assign I2C pins to USCI_B0
+	BCSCTL1 = CALBC1_8MHZ;                    // Set DCO to 1MHz
+	DCOCTL =  CALDCO_8MHZ;
 
-	P2SEL &= ~(BIT4 + BIT5);
+	P1SEL |= BIT6 + BIT7;                 	// Assign I2C pins to USCI_B0
+	P1SEL2|= BIT6 + BIT7;                   // Assign I2C pins to USCI_B0
+
+	P2SEL &= ~(BIT4 + BIT5);				// RST and CSB outputs
 	P1SEL &= ~(BIT4 + BIT5);
 	P2DIR |= (BIT4 + BIT5);
 	P2OUT &= ~(BIT5);
 	P2OUT |= BIT4;
 
-	UCB0CTL1 |= UCSWRST;                      // Enable SW reset
-	UCB0CTL0 = UCMST + UCMODE_3 + UCSYNC;     // I2C Master, synchronous mode
-	UCB0CTL1 = UCSSEL_2 + UCSWRST;            // Use SMCLK, keep SW reset
-	UCB0BR0 = 12;                             // fSCL = SMCLK/12 = ~100kHz
+	UCB0CTL1 |= UCSWRST;                     // Enable SW reset
+	UCB0CTL0 = UCMST + UCMODE_3 + UCSYNC;    // I2C Master, synchronous mode
+	UCB0CTL1 = UCSSEL_2 + UCSWRST;           // Use SMCLK, keep SW reset
+	UCB0BR0 = 20;                            // fSCL = SMCLK/20 = 400kHz
 	UCB0BR1 = 0;
-	UCB0I2CSA = 0x3F;                         // Set slave address
-	UCB0CTL1 &= ~UCSWRST;                     // Clear SW reset, resume operation
+	UCB0I2CSA = 0x3F;                        // Set slave address
+	UCB0CTL1 &= ~UCSWRST;                    // Clear SW reset, resume operation
 
+	// Reset display
 	CLR_RST;
 	CLR_CSB;
-	t_delay(100);
+	t_delay(10);
 	SET_RST;
-	t_delay(100);
+	t_delay(10);
 	SET_CSB;
-	t_delay(100);
+	t_delay(10);
 
-	// Las interrupciones se habilitan dentro
+	// Init LCD. Interrupts are enabled inside
 	init_LCD();
 
-	write_line((unsigned char *) dummy);
+	//Clear entire screen
+	clear_screen();
 
+	// Transform text to bitmap
+	write_line((unsigned char *) "En un lugar de La Mancha de");
+	// Send bitmap buffer to desired line
 	send_line(0);
-	send_line(1);
-	send_line(2);
-	send_line(3);
-	send_line(4);
-	send_line(5);
 
+	// Transform text to bitmap
+	write_line((unsigned char *) "cuyo nombre no quiero");
+	// Send bitmap again, this time to the third line
+	send_line(2);
+
+	// Transform text to bitmap
+	write_line((unsigned char *) "acordarme");
+	// Send bitmap again, this time to the third line
+	send_line(4);
+
+
+	// End
 	__bis_SR_register(CPUOFF);          // Enter LPM0 w/ interrupts
 
 }
@@ -388,6 +467,7 @@ __interrupt void USCIAB0TX_ISR(void)
 {
   static unsigned int ByteCtr;
 
+  // For data, send four times each byte for entire black
   if(block_repeat)
   {
 	  UCB0TXBUF = block_ptr[ByteCtr>>2];
@@ -395,18 +475,19 @@ __interrupt void USCIAB0TX_ISR(void)
 
 	  if(ByteCtr>(block_length<<2))
 	  {
-		  __bic_SR_register_on_exit(CPUOFF);        // Exit LPM0
+		  __bic_SR_register_on_exit(CPUOFF + GIE);        // Exit LPM0
 		  ByteCtr=0;
 		  block_repeat = 0;
 	  }
   }
+  // For commands, normal behavior
   else
   {
 	  UCB0TXBUF = block_ptr[ByteCtr++];          // Transmit data byte
 
 	  if(ByteCtr>block_length)
 	  {
-		  __bic_SR_register_on_exit(CPUOFF);        // Exit LPM0
+		  __bic_SR_register_on_exit(CPUOFF + GIE);        // Exit LPM0
 		  ByteCtr=0;
 	  }
   }
