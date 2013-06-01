@@ -6,7 +6,7 @@ The hardware has the following characteristics:
   - Platform MSP430 Launchpad
   - Processor MSP430G2553 @ 8MHz
 
-The display is hard wire connected to the display using a brekout board (Digikey NHD-COG14-36-ND) and a FPC connector (Digikey A100284CT-ND)
+The display is hard wire connected to the Launchpad  MSP-EXP430G2 using a breakout board (Digikey NHD-COG14-36-ND) and a FPC connector (Digikey A100284CT-ND)
   - P1.7	SDA 	(pin 5)
   - P1.6	SCL 	(pin 4)
   - P2.5	RST	(pin 2)
